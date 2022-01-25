@@ -1,0 +1,155 @@
+---
+title: "Homework 5"
+author: "David Hackett"
+date: "11/2/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+##Setup
+```{r}
+# clear working memory
+rm(list=ls())    
+
+# Open output file for results
+sink("simulate_CLT.Rout", split=TRUE)
+
+library('rmutil') 
+library("tidyverse")
+
+```
+
+## Function to generate means
+```{r}
+set.seed(11022021)
+
+generate_simulated_means <- function(N){
+   # Generate the mean and standard deviations of N observations from the specified distribution functions
+  
+  # y1 is binary with Pr(y1=1) = 0.35
+  y1 <- ifelse(runif(N) < .35, 1, 0)
+   
+  # y2 is binary with Pr(y2=1) = 0.97
+  y2 <- ifelse(runif(N) < .97, 1, 0)
+   
+  # y3 is a binary variable with Pr(y3=1) = .9 and if y = 1, x is drawn from a standard normal distribution, otherwise x is drawn from a normal distribution with mean 100 and a standard deviation of 20   
+  # Draw a uniform sample where Pr(y=1) =.9 and take the mean 
+  mean_of_binaries = mean(ifelse(runif(N) < .9, 1, 0))
+  
+  #Use the mean to determine a count of y's that equal 1
+  num_of_1s = N * mean_of_binaries
+  
+  #Just for convenience get the number of 0's also
+  num_of_0s = N - num_of_1s
+  
+  #Combine a standard normal distribution draw for the number of 1s with a normal distribution draw with the a mean of 100 and a sd of 20 for the number of 0's
+  y3 <- c(rnorm(num_of_1s, 0, 1), rnorm(num_of_0s, 100, 20))
+   
+    # put data into data_frame so it is easier to summarize
+   data <- data_frame(y1,y2,y3)
+   
+   means <- sapply(data, mean)
+   
+   # name the means appropriately
+   names(means) <- c("mu1", "mu2", "mu3")
+   
+   # get the sds for each column
+   sds <- sapply(data, sd)
+    
+   # name the sds appropriately
+   names(sds) <- c("sd1", "sd2", "sd3")
+   
+   # return the means and standard deviation associated with each of the three samples (y1-3) of size N.
+   return(c(means, sds))
+}
+
+
+```
+
+## Functions for z scores and significance testing
+```{r}
+get_zscores <-function(obs_mean, true_mean, obs_sd, N){
+  zscores <- (obs_mean - true_mean) / (obs_sd / sqrt(N))
+  return( zscores ) 
+}
+
+significance_test_right <- function(zscores, alpha = 1.96){
+  beyond_critical_point <- as.numeric( zscores > alpha ) 
+  percent_significantly_different <- mean( beyond_critical_point )
+  return( percent_significantly_different )
+}
+
+significance_test_left <- function(zscores, alpha = 1.96){
+  beyond_critical_point <- as.numeric(zscores < -alpha ) 
+  percent_significantly_different <- mean( beyond_critical_point )
+  return( percent_significantly_different )
+}
+```
+
+## The simulation
+```{r}
+sample_sizes = c(36, 64, 100, 225, 2500, 12100)
+monte_carlo <- function(N, reps = 1000){
+
+  replicated_sims <- replicate(reps, generate_simulated_means(N))
+  
+  expected_mu1 <- 0.35
+  expected_mu2 <- 0.97   
+  expected_mu3 <- 10
+
+  z1 <- get_zscores(replicated_sims['mu1', ], expected_mu1, replicated_sims['sd1', ], N)
+  z2 <- get_zscores(replicated_sims['mu2', ], expected_mu2, replicated_sims['sd2', ], N)
+  z3 <- get_zscores(replicated_sims['mu3', ], expected_mu3, replicated_sims['sd3', ], N)
+
+  sigr1 <- significance_test_right(z1)
+  sigl1 <- significance_test_left(z1)
+  print(paste("Percentage of simulated means in right tail from sampling distribution 1 :", sigr1))
+  print(paste("Percentage of simulated means in left tail from sampling distribution 1 :", sigl1))
+  
+  sigr2 <- significance_test_right(z2)
+  sigl2 <- significance_test_left(z2)
+  print(paste("Percentage of simulated means in right tail from sampling distribution 2 :", sigr2))
+  print(paste("Percentage of simulated means in left tail from sampling distribution 2 :", sigl2))
+  
+  sigr3 <- significance_test_right(z3)
+  sigl3 <- significance_test_left(z3)
+  print(paste("Percentage of simulated means in right tail from sampling distribution 3 :", sigr3))
+  print(paste("Percentage of simulated means in left tail from sampling distribution 3 :", sigl3))
+  
+  return(c(sigr1, sigl1, sigr2, sigl2, sigr3, sigl3))
+  
+}
+
+results <- data_frame(c("Dist 1 Right Tail", "Dist 1 Left Tail", "Dist 2 Right Tail", "Dist 2 Left Tail", "Dist 3 Right Tail", "Dist 3 Left Tail"))
+
+for (N in sample_sizes){
+  print(paste('Starting simulations with samples of size', N))
+  result <- monte_carlo(N, 10000)
+  print('')
+  results[as.character(N)] <- result 
+}
+
+print(results)
+```
+
+## Interpretation
+
+1. a
+For the first distribution, Pr(x=1) = .35, the central limit theorem isn't too bad early on with the smaller distribution but begins to approximate really well when n=2500 and above.
+
+1. b
+For the second distribution Pr(x=1) .97, early on the numbers are quite a bit off, especially low in the left tail and high in the right tail, it's not until the sample of 12100 that it begins to resemble the expected.
+
+
+4. a
+Since the expected value of the standard normal distribution is 0 and the expected value of the normal distribution with a mean of 100 is, well, 100. The mean of x would simply be 0.9 * 0 + 0.1 * 100 or 10.
+
+4. b
+This distribution starts out pretty far off, but by the time it reachs 12100 it is approximating the value pretty well. 
+
+
+

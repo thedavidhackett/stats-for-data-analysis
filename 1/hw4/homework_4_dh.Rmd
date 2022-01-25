@@ -1,0 +1,316 @@
+---
+title: "Homework 4"
+author: "David Hackett"
+date: "10/25/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+#Set up
+library(dplyr) 
+library(ggplot2) 
+library(moments)
+```
+
+```{r}
+# Import the data and check it out
+data <- read.csv("ppha312x2021.csv")
+summary(data)
+
+# Make age a numeric value
+#data <- data %>% mutate(age = as.numeric(age))
+
+## delete income less than 0
+#data <- data %>% filter(inctot >= 0)
+
+#ggplot(data, aes(inctot)) +
+  #geom_histogram(bins = 50) +
+  #theme_classic() +
+  #xlab('Total Income')
+
+#ggplot(data, aes(incwage)) +
+  #geom_histogram(bins = 50) +
+  #theme_classic() +
+  #xlab('Income from wages')
+
+```
+
+
+1. a) Making a dummy variable for whether the respondent is hispanic or african american
+```{r}
+
+# Look at the values in race
+data$race %>%
+  unique()
+
+# Look at values in hispan
+data$hispan %>%
+  unique()
+
+# Add the two dummy columns
+data <- data %>% 
+  mutate(ishispanic = ifelse(hispan == "Not Hispanic", 0, 1), isafricanamerican = ifelse(race == "Black/African American/Negro", 1, 0))
+
+```
+1. b) Limit the sample to white, non-Hispanic or African American, non-Hispanic respondents
+```{r}
+data_filtered <- data %>%
+  filter((race == "White" | isafricanamerican == 1) & ishispanic == 0)
+```
+
+1. c) Limit the sample to those 25 to 59 years of age
+
+```{r}
+data_filtered <- data_filtered %>%
+  filter(age >= 25 & age <= 59)
+```
+
+1. d) Define a binary variable if the respondent is female
+
+```{r}
+
+# Look at values in sex
+data_filtered$sex %>%
+  unique()
+
+data_filtered <- data_filtered %>%
+  mutate(isfemale = ifelse(sex == "Female", 1, 0) )
+
+```
+1. e) Create an education variable with five categories: Less than high school (including GED recipients), high school degree, some college (including associates degree), bachelor’s degree, and graduate degree
+
+```{r}
+
+# Look at values in educd
+data_filtered$educd %>%
+  unique
+
+# Use case when to set education
+data_filtered <- data_filtered %>%
+  mutate(education = case_when(educd == "Master's degree" 
+                               | educd == "Professional degree beyond a bachelor's degree"
+                               | educd == "Doctoral degree"
+                               ~ "graduate degree",
+                               educd == "Bachelor's degree"
+                               ~ "bachelor's degree",
+                               educd == "1 or more years of college credit, no degree"
+                               | educd == "Some college, but less than 1 year"
+                               | educd == "Associate's degree, type not specified"
+                               ~ "some college",
+                               educd == "Regular high school diploma"
+                               ~ "high school degree",
+                               TRUE ~ "less than high school"
+                               ))
+```
+1. f) Define a dummy variable for whether the respondent is employed
+```{r}
+# Look at values in educd
+data_filtered$empstat %>%
+  unique
+
+# Create dummy variable for isemployed
+data_filtered <- data_filtered %>%
+  mutate(isemployed = ifelse(empstat == "Employed", 1, 0))
+
+```
+2. Comparing the educational attainment levels of african americans to white respondents
+
+The chart of % of attainment between white and african american respondents might be hard to interpret but from the bar chart you can see that white educational attainment skews more to the right (ie higher levels of attainment) while african american educational attainment skews to to the left (lower levels). Whites tend to have higher rates for bachelors and graduate degrees while african americans have higher rates for some college, high school, or no high school.
+
+```{r}
+data_filtered <- data_filtered %>% 
+  mutate(education = factor(education, 
+                               levels= c("less than high school", "high school degree", "some college", "bachelor's degree", "graduate degree" )), race = as.factor(race))
+
+educ_level_white_v_african_american <- data_filtered %>%
+  count(race, education) %>%
+  group_by(race) %>%
+  mutate(freq = n / sum(n))
+
+print(educ_level_white_v_african_american)
+
+educ_level_white_v_african_american %>%
+    ggplot(aes(y = freq, x = education, fill= race)) + 
+  geom_col(position = "dodge") + 
+  labs(y = "% educational attaninment", x = "", title = "Educational Attainment for Whites and African Americans") + 
+  theme_minimal()
+
+```
+3. Compare the employment rate by sex for African Americans and whites
+
+Whites have higher rates of employment than african americans although the gap is much smaller between females. White males have the highest level of employment, higher than their female counterparts, but african american females have higher rates of employment than african american males.
+
+```{r}
+data_filtered <- data_filtered %>% 
+  mutate(isemployed = as.factor(isemployed), isfemale = as.factor((isfemale)))
+
+employment_by_race_and_sex <- data_filtered %>%
+  #Get rid of the na's since we don't actually know whether they are employed or not
+  filter(empstat != "N/A") %>%
+  group_by(race, isfemale) %>%
+  count(isemployed) %>%
+  mutate(freq = n / sum(n)) %>%
+  filter(isemployed == 1)
+
+print(employment_by_race_and_sex)
+
+employment_by_race_and_sex %>%
+    ggplot(aes(y = freq, x = isfemale, fill= race)) + 
+  geom_col(position = "dodge") + 
+  labs(y = "% Employment", x = "", title = "Employment By Race and Sex") + 
+  theme_minimal() +
+  scale_x_discrete(breaks=c("0", "1"),
+        labels=c("Male", "Female"))
+
+```
+4. Conditional on working, compare hours worked and its standard deviation by sex for African Americans and whites.
+
+Employed white males on average worked the most hours (44ish) with african american males working the second most hours (42ish). Females of both races on average worked a very similar amount of hours (around 39) with african american women working slightly more hours.
+
+```{r}
+# Make hours worked numeric
+data_filtered <- data_filtered %>%
+  mutate(hours_worked = as.numeric(uhrswork))
+
+# Make sure that doesn't look weird
+summary(data_filtered$hours_worked)
+
+data_filtered %>%
+  filter(isemployed == 1, !is.na(hours_worked)) %>%
+  group_by(isafricanamerican, isfemale) %>%
+  summarise("Mean Hours Worked" = mean(hours_worked), "Standard Deviation Hours Worked" = sd(hours_worked))
+  
+
+```
+5. Conditional on working, compare total income, its standard deviation, and its skewness by education and sex for African Americans and whites.
+
+```{r}
+# use a histogram to find weird values
+
+data_filtered %>%
+ggplot(aes(inctot)) +
+  geom_histogram(bins = 100) +
+  theme_classic() +
+  xlab('Total Income')
+
+# the really high values seem off, and there are also negative values (which could be true actually if they are losing income in other ways) which I'll remove
+data_filtered_incomes <- data_filtered %>%
+  filter(inctot >= 0, inctot < 9999999 )
+
+# This one looks more realistic
+data_filtered_incomes %>%
+ggplot(aes(inctot)) +
+  geom_histogram(bins = 100) +
+  theme_classic() +
+  xlab('Total Income')
+```
+After cleaning the data a little it looks like the mean income of white males is by far the highest,nearly 90000, white females come in second with about 57,500, black males are next with just below 45,00, or about half the mean of their white counterparts and african american females make just below 40k. The standard deviations followed the same order with white males have the largest and african american women having the smallest. All groups skew to the right having positive skewness, but white males skew the least, african american females skew the second least and african american men skew the most to the right.
+```{r}
+data_filtered_incomes %>%
+  filter(isemployed == 1) %>%
+  group_by(isafricanamerican, isfemale) %>%
+  summarise("Mean Income" = mean(inctot), "SD of Income" = sd(inctot), "Skew of Income" = skewness(inctot), "maximum" = max(inctot))
+
+data_filtered_incomes %>%
+  filter(isemployed == 1) %>%
+  ggplot(aes(inctot)) +
+    geom_histogram(bins = 100) +
+    theme_classic() +
+    xlab('Total Income') +
+    facet_grid(vars(race),vars(sex))
+
+```
+6. For those with positive wages, compare the wage income, its standard deviation, and its skewness by education and sex for African Americans and whites.
+
+```{r}
+
+## doing the same cleaning for wages
+data_filtered %>%
+ggplot(aes(incwage)) +
+  geom_histogram(bins = 100) +
+  theme_classic() +
+  xlab('Income from wages')
+
+# only positive wages and no outliers
+data_filtered_wages <- data_filtered %>%
+  filter(incwage > 0, incwage < 999999 )
+
+data_filtered_wages %>%
+ggplot(aes(incwage)) +
+  geom_histogram(bins = 100) +
+  theme_classic() +
+  xlab('Income from wages')
+
+```
+This produced somewhat similar results to total income with white males being very far ahead of the other groups in terms of mean and having the highest standard deviation, white females were second in both categories then african american males and then african american females. Again all had a postive or right skew, but this time african american females were the least skewed, african american males were the most skewed, white females were second and white males were the second least skewed.
+```{r}
+data_filtered_wages %>%
+  group_by(isafricanamerican, isfemale) %>%
+  summarise("Mean Wages" = mean(incwage), "SD of Wages" = sd(incwage), "Skew of Wages" = skewness(incwage))
+
+data_filtered_wages %>%
+  ggplot(aes(incwage)) +
+    geom_histogram(bins = 100) +
+    theme_classic() +
+    xlab('Income from Wages') +
+    facet_grid(vars(race),vars(sex))
+
+```
+7. Calculate employment rates by age and sex for African Americans and whites.
+
+I organized ages into 10 year ranges (though 25-29 for the youngest since we start at 25). White women have a dip in their employment rate in their 30's (as do white men, perhaps more men are staying home to take care of their children)? Black men have a steady incline until their 50s, but start off rather low as do black women though they see a huge jump in their 30s (moving ahead of white women in employment) followed by a steady decline through their 40s and 50s. White men only experience a slight decline in employment in their 50's
+
+```{r}
+
+data_filtered <- data_filtered %>%
+  mutate(age_group = case_when(age < 30 ~ "25 to 29",
+                               age >= 30 & age < 40 ~ "30 to 39",
+                               age >= 30 & age < 50 ~ "40 to 49",
+                               age >= 50 & age < 60 ~ "50 to 59",
+                               ))
+
+employment_rate_by_age_race_sex <- data_filtered %>%
+  filter(empstat != "N/A") %>%
+  group_by(race, sex, age_group) %>%
+  count(isemployed) %>%
+  mutate(freq = n / sum(n)) %>%
+  filter(isemployed == 1)
+
+print(employment_rate_by_age_race_sex)
+
+employment_rate_by_age_race_sex %>%
+    mutate(category = paste(race, sex)) %>%
+    group_by(category, age_group) %>%
+    ggplot(aes(x=age_group, y=freq, group=category)) +
+      geom_line(aes(color=category))+
+      geom_point()
+
+```
+8. Conditional on working, compare the hours worked by education and sex for African Americans and whites.
+
+Hours worked tend to rise as the educational attainment goes up with males working more hours on average than females. White women work the least hours until they get to the graduate level, at which point they work more than any other group besides white males. 
+
+```{r}
+hours_worked_by_ed_race_sex <- data_filtered %>%
+  filter(isemployed == 1) %>%
+  filter(!is.na(hours_worked)) %>%
+  group_by(race, sex, education) %>%
+  summarise(mean_hours_worked = mean(hours_worked), sd_hours_worked = sd(hours_worked), skew_hours_worked=skewness(hours_worked))
+
+print(hours_worked_by_ed_race_sex)
+
+hours_worked_by_ed_race_sex %>%
+    mutate(category = paste(race, sex)) %>%
+    ggplot(aes(x=education, y=mean_hours_worked, fill=category)) +
+    geom_col(position = "dodge") +   
+    labs(y = "Mean Hours Worked", x = "", title = "Hours Worked by Sex, Education, and Race") + 
+    theme_minimal() 
+
+```
+

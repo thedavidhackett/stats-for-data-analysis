@@ -1,0 +1,125 @@
+---
+title: "Homework 6"
+author: "David Hackett"
+date: "11/9/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1 a) In a two sided test with only 5 trials, a result of 4 or 5 successes would be needed to reject the null hypothesis of pr(x=1) = 1/3. Any other outcome we could not reject the null hypothesis.
+
+```{r}
+x <- seq(0,5,by = 1)
+y <- dbinom(x,size=5,prob=1/3)
+plot(x,y)
+
+binom.test(x = 5, n = 5, p = 1/3,
+           alternative = "two.sided",
+           conf.level = 0.95)
+
+binom.test(x = 4, n = 5, p = 1/3,
+           alternative = "two.sided",
+           conf.level = 0.95)
+```
+
+1. b) With 5 trials for a fair die and in a one sided hypothesis test where the alternative hypothesis is less than 1/3 there is not roll than could lead you to reject the null hypothesis
+
+```{r}
+x <- seq(0,5,by = 1)
+y <- dbinom(x,size=5,prob=1/3)
+plot(x,y)
+
+binom.test(x = 0, n = 5, p = 1/3,
+           alternative = "less",
+           conf.level = 0.95)
+
+```
+
+
+2. a)  In a two sided test with 25 trials, a result of 3 or less successes or 14 or more successes would be needed to reject the null hypothesis of pr(x=1) = 1/3. Any other outcome we could not reject the null hypothesis.
+
+```{r}
+
+x <- seq(0,25,by = 1)
+y <- dbinom(x,size=25,prob=1/3)
+plot(x,y)
+
+binom.test(x = 14, n = 25, p = 1/3,
+           alternative = "two.sided",
+           conf.level = 0.95)
+
+binom.test(x = 3, n = 25, p = 1/3,
+           alternative = "two.sided",
+           conf.level = 0.95)
+
+```
+
+2. b) With 25 trials for a fair die you would need 4 or less rolls to reject the null hypothesis of of Pr(x=1) = 1/3 if the alternative hypothesis is less than 1/3
+
+```{r}
+x <- seq(0,25,by = 1)
+y <- dbinom(x,size=25,prob=1/3)
+plot(x,y)
+
+binom.test(x = 4, n = 25, p = 1/3,
+           alternative = "less",
+           conf.level = 0.95)
+
+```
+
+
+3. P Values for the fisher test and the chi square test are both high (over 90%) meaning we can't reject the null hypothesis that white females and black females have the same employment rate
+
+
+```{r}
+
+library(dplyr) 
+data <- read.csv("ppha312x2021.csv")
+data <- mutate(data, age = as.numeric(age))
+data <- data %>% 
+  mutate(ishispanic = ifelse(hispan == "Not Hispanic", 0, 1), isafricanamerican = ifelse(race == "Black/African American/Negro", 1, 0))
+
+data_filtered <- data %>%
+  filter(age >= 25 & age <= 55, race == "White" | race == "Black/African American/Negro", ishispanic == 0, sex == "Female")
+
+data_filtered <- data_filtered %>%
+  mutate(isemployed = ifelse(empstat == "Employed", 1, 0))
+
+data_filtered %>%
+  group_by(race) %>%
+  count(race, isemployed) %>%
+  summarise(n, freq= n/sum(n))
+
+# white female employed: 811 
+# white female umemployed: 270
+# black female employed: 600
+# black female unemployed: 202
+
+d <- matrix(c(793,265,600,202), nrow=2)
+fisher.test(d, alternative='two.sided')
+
+
+chisq.test(d, correct = FALSE)
+```
+4. The p value for this test is extremely low (1.067e-09) meaning we can reject the null hypthesis. Given the extremely low p value and the amount of data I'm very confident in this result.
+
+```{r}
+
+data_filtered_again <- data_filtered %>%
+  filter(inctot >= 0 & inctot < 9999999)
+
+white_female_incomes <- data_filtered_again %>%
+  filter(race == "White") %>%
+  pull(inctot)
+
+black_female_incomes <- data_filtered_again %>%
+  filter(race == "Black/African American/Negro") %>%
+  pull(inctot)
+
+t.test(white_female_incomes, black_female_incomes, mu=0)
+```
+
+

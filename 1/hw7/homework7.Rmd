@@ -1,0 +1,73 @@
+---
+title: "homework7"
+author: "David Hackett"
+date: "12/5/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Some set up
+```{r}
+library(tidyverse)
+library(boot)
+rm(list=ls())
+
+data <- read.csv("ppha312x2021.csv")
+set.seed(120521) 
+```
+
+Redo setup from homework 4
+
+```{r}
+# Dummy variable for black and hispanic
+data <- data %>% 
+  mutate(ishispanic = ifelse(hispan == "Not Hispanic", 0, 1), isafricanamerican = ifelse(race == "Black/African American/Negro", 1, 0))
+
+# filter out only white and black non-hispanic
+data_filtered <- data %>%
+  filter((race == "White" | isafricanamerican == 1) & ishispanic == 0)
+
+# filter ages between 25 and 59 inclusive
+data_filtered <- data_filtered %>%
+  filter(age >= 25 & age <= 59)
+
+# dummy variable for sex
+data_filtered <- data_filtered %>%
+  mutate(isfemale = ifelse(sex == "Female", 1, 0) )
+
+# dummy variable for employed
+data_filtered <- data_filtered %>%
+  mutate(isemployed = ifelse(empstat == "Employed", 1, 0))
+
+# keep only positive wages and remove wages clustered at 999999 assuming those are marked that way because they are missing
+data_filtered <- data_filtered %>%
+  filter(incwage >= 0, incwage < 999999 )
+```
+
+1.a Boostrap simulation for the correlation coefficient between wages and age among african american women
+
+```{r}
+#Get only african american women that are employed, make age numeric
+aa_w <- data_filtered %>%
+  filter(isfemale == 1, isafricanamerican == 1, isemployed == 1) %>%
+  mutate(age = as.numeric(age))
+
+#Check correlation based on sample
+cor(aa_w$incwage, aa_w$age)
+
+#Create bootstrap function
+corr <- function(x, indices){
+  data <- x[indices, ] 
+  corr <- cor(data$incwage, data$age)
+  return( corr )
+}
+
+coefficient <- boot(aa_w, 
+                   corr, 
+                   10000)
+coefficient
+```
+We find that the standard error is 0.038

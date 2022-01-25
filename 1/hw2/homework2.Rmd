@@ -1,0 +1,44 @@
+---
+title: "Stats Homework 2"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Homework 2 
+
+## Question 7a
+
+The sample has a mean of 3.67 and a standard deviation of 1.496
+
+```{r sample}
+library(tidyverse)
+set.seed(10132021)
+sample_size = 100
+values = 1:5
+probabilities = c(1/15, 2/15, 3/15, 4/15, 5/15)
+a_sample <- c(sample(values, sample_size, replace = TRUE, prob=probabilities))
+
+sample_mean <- mean.default(a_sample, trim = 0, na.rm = FALSE) 
+print('Sample Mean:')
+print(sample_mean) 
+
+sample_var <- var(a_sample)
+print('Sample Variance:') 
+print(sample_var)
+```
+## Question 7b
+
+The mean of the distribution is 3.6667 and the variance is 1.5556. The sample was a little off, the mean was just of by less than 0.01, while the variance was off by about 0.06.
+
+```{r distribution}
+mean_distribution <- sum(values * probabilities)
+var_distribution <- sum((values)^2 * probabilities) - mean_distribution^2
+
+print("Distribution Mean:")
+print(mean_distribution)
+print("Distribution Variance:")
+print(var_distribution)
+```

@@ -1,0 +1,135 @@
+---
+title: "ps1"
+author: "David Hackett"
+date: "1/15/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Part 1
+
+![Questions 1 and 2]("q1-2")
+
+![Questions 3 and 4]("q3-4")
+
+
+
+```{r}
+# Setup
+library(RCT)
+library(tidyverse)
+star <- read_csv("star.csv")
+
+```
+
+# Part 2: Tennessee STAR Experiment
+
+## Question 1: Balance Table
+
+```{r}
+
+# This can also get you there but wasn't sure if it was too much of a short cut...
+# star %>%
+#   filter(T1 == 0) %>%
+#   balance_table("T2")
+
+
+star.small_class <- star %>%
+  filter(T2 == 1, T1 == 0)
+
+star.control <- star %>%
+  filter(T2 == 0, T1 == 0)
+
+covariates <- c("sch_inner_city", "sbirthdate_yq", "sfemale", "swhite", "sfree_lunch", "ttotexpk", "tmasters", "twhite")
+
+star_table <- tibble(characteristic = character(),
+                     regular_class = numeric(),
+                     small_class = numeric(),
+                     difference = numeric(),
+                     p_value = numeric())
+
+for (covariate in covariates) {
+
+  control <- star.control %>%
+    pull(covariate)
+
+  small_class <- star.small_class %>%
+    pull(covariate)
+
+  control_mean <- mean(control, na.rm = TRUE)
+  small_class_mean <- mean(small_class, na.rm = TRUE)
+  p_value <- t.test(control, small_class)$p.value
+
+
+  star_table <- star_table %>%
+    add_row(characteristic = covariate,
+            regular_class = control_mean,
+            small_class = small_class_mean,
+            difference = small_class_mean - control_mean,
+            p_value = p_value
+            )
+}
+
+print(star_table)
+```
+For most of the covariates the difference is not significant. However the p value for the treatment (small classes) vs the control for the differences in the % of teachers that had a masters and are white were significant (in the case of whether the teacher was white or not, very significant). This does pose a potential issue in comparing the treatment to the control as we might think that both of these covariates could reasonably affect the outcomes.
+
+
+## Question 2
+
+```{r}
+results <- star %>%
+  group_by(T1, T2) %>%
+  summarise(reading = mean(treadssk, na.rm = TRUE), math = mean(tmathssk, na.rm = TRUE))
+
+print(results)
+
+reading_scores <- results %>%
+  pull('reading')
+
+math_scores <- results %>%
+  pull("math")
+
+star.aide <- star %>%
+  filter(T1 == 1)
+
+reading_t1 <- t.test(star.aide %>% pull(treadssk), star.control %>% pull(treadssk))$p.value
+
+math_t1 <- t.test(star.aide %>% pull(tmathssk), star.control %>% pull(tmathssk))$p.value
+
+reading_t2 <- t.test(star.small_class %>% pull(treadssk), star.control %>% pull(treadssk))$p.value
+
+math_t2 <- t.test(star.small_class %>% pull(tmathssk), star.control %>% pull(tmathssk))$p.value
+
+results_table <- tibble(test = c("Treatment 1 vs Control Reading",
+                                "Treatment 1 vs Control Math",
+                                "Treatment 2 vs Control Reading",
+                                "Treatment 2 vs Control Math"),
+                       treatment_effect = c(reading_scores[3] - reading_scores[1],
+                                            math_scores[3] - math_scores[1],
+                                            reading_scores[2] - reading_scores[1],
+                                            math_scores[2] - math_scores[1]),
+                       pvalues = c(reading_t1, 
+                                   math_t1, 
+                                   reading_t2, 
+                                   math_t2))
+
+print(results_table)
+
+```
+As you can see from the table treatment one had a very small positive effect on reading and a very small negative effect on math. Unsurprisingly neither difference is significant. In the case of treatment 2 there is a positive effect for both reading and math scores over the control. The p values are very low (much lower than a significance level of 0.05) showing that this difference is significant. In the case of treatment 1, we can't reject the null hypothesis that there no difference in test scores for students in the control and students in a regular class with an aide, but we can reject the null hypothesis for treatment 2, there is evidence that students in treatment 2 had different (in this case higher) test scores than the control group. However we also have to take into consideration the balance table that showed a significant difference in some of the covariates between the control group and the treatment group for treatment 2. This means the experiment was estimating the impact of the program mixed with the impact of those two covariates (the race and education level of the teacher) so we are not technically estimating the true impact of small classes.
+
+3. We really can't conclude anything from the observational data. There may be a negative correlation between class size and test scores, but there could be other variables that are causing that correlation. For example wealthier students maybe go to schools with small classes (because their districts can afford more teachers) and those students may perform better on tests because of all the other advantages afforded to them through wealth. There are potentially omitted variables or selection bias that may be causing that relationship rather than it being caused by the smaller classes.
+
+# Part 3: Short Answer
+
+1. No, not by itself. If there is any selection bias no matter how large the samples are if people are allowed to choose/are not randomized the selection bias won't go anywhere. Randomized control trials can remove the selection bias since assignment in random. This, paired with LLN should ensure the treatment and control groups are balanced (although problems can still arise).
+
+2. Yes, though we must also know the degrees of freedom so we can calculate a p value. That p value should tell us the significance of the difference.
+
+3. This is only true if x and y are uncorrelated: cov(x,y) = 0.
+
+4. That depends on a lot of different things, so not necessarily. A RCT is the gold standard for showing causal inference, but alot of things can go wrong in designing and carrying out an experiment. Also worth keeping in mind is that RCTs can be expensive, time consuming, impractical or even impossible. In those cases collecting observational data may be better or in fact the only option. 

@@ -1,0 +1,43 @@
+---
+title: "Homework3"
+author: "David Hackett"
+date: "10/19/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 5
+
+```{r}
+library(tidyverse)
+set.seed(10192021)
+sample_size = 50
+
+
+grid <- expand.grid(x = 1:3, y=1:4)
+
+probabilities <- c(0.15, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.1, 0.05, 0.25, 0.1)
+
+a_sample <- sample_n(grid, sample_size, replace=TRUE, weight=probabilities)
+
+a_sample %>%
+  summarize("Mean of X, N=50" = mean(x), "Mean of Y, N=50" = mean(y), "Variance of X, N=50" = var(x), "Variance of Y, N=50" = var(y), "Covariance of X and Y, N=50" = cov(x, y))
+
+sample_size <- 500
+
+another_sample <- sample_n(grid, sample_size, replace=TRUE, weight=probabilities)
+
+another_sample %>%
+  summarize("Mean of X, N=500" = mean(x), "Mean of Y, N=500" = mean(y), "Variance of X, N=500" = var(x), "Variance of Y, N=500" = var(y), "Covariance of X and Y, N=500" = cov(x, y))
+
+```
+With a sample size of 50, the mean and variance of x is 2.26 and .604 respectively and with a sample size of 500 its 1.95 and 0.61. These are all very close to the distributions mean and variance for X, 2 and .6 respectively. Its weird that the variance was a little more off in the larger sample size so I experimented with some other seeds and in all of those the larger size was closer. 
+
+For Y with a sample size of 50 the mean and variance were 2.5 and 1.64. With a sample size of 500 the mean and variance were 2.72 and 1.54. The distribution's mean and variance for y was 2.75 and 1.4875 so the sample size of 500 got pretty close. 
+
+For the covariance of the two the sample size of 50 found it to be .173 and the sample size of 500 found it to be .284, which is just 0.034 off the covariance of the distribution (.25)
+
+R did better with the covariances, but except for the really good simulation of x's variance at 50, stata was closer for variances and expected values.

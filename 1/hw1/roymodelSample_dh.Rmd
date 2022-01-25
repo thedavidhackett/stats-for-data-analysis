@@ -1,0 +1,205 @@
+---
+title: "Roy Model"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+### Monday, October 8 5:00 - 6:20 PM
+
+## Setup
+
+The section loads libraries that we will need to use to run the code below.
+
+```{r setup}
+# For this session we will load the tidyverse, a commonly used set of R libraries
+# Find more information here: https://www.tidyverse.org/packages/
+library('tidyverse')
+library('MASS')
+```
+
+## Roy Model
+
+In the context of lecture, the Roy Model was used to motivate the need for economic and statistical models to underly our analysis of observed phenomena in public policy. To (hopefully) illustrate the model as well as some of the power of computational tools, here is a brief simulation of the model. The expectation is NOT that you can put this together yourself right now.
+
+### Generate Random Data
+
+The first step is to generate random data from two correlated distributions with the characteristics described in class, i.e. Economist earnings are normally distributed with mean = 60k and stdev = 10k, and Accountant earnings are normally distributed with mean = 65k and st dev = 5k. This generation will produce data that pairs draws from both distribution, i.e. we are observing for every theoretical individual in our sample both their potential earnings as an accountant and their potential earnings as an economist. 
+
+```{r data}
+set.seed(10042018)
+samples <- 1000000  # Sample size or size of population
+cor <- 0.9 # correlation coefficient
+
+# Generate correlated std normal random sample using the mvnorm function from MASS package
+data <- mvrnorm(n=samples, mu=c(0, 0), Sigma=matrix(c(1, cor, cor, 1), nrow=2), empirical=FALSE)
+
+# Convert to dataframe
+df1 <- as_data_frame(data)
+
+# Make the dataframe easier to use 
+df1 <- df1 %>% dplyr::rename(accnt = V1, econ = V2) # rename columns
+
+# Change distributions from std normal to those specified in lecture:
+# Accounting ~ N(65000, 5000)
+# Economics ~ N(60000, 10000)
+mu_econ <- 60000
+sigma_econ <- 10000
+mu_accnt <- 65000
+sigma_accnt <- 5000
+
+df1 <- df1 %>% mutate(
+        accnt = accnt*sigma_accnt + mu_accnt, # update accounting variable
+        econ = econ*sigma_econ + mu_econ # update econ variable
+)
+```
+
+### Sanity Checks
+
+Let's run a few checks to make sure data looks reasonable. First we'll use the `head` and `tail` commands to get a look at the data. Then, we will make sure that the correlation between the accoutant and economist distributions is 0.86, the value we set when we generated the data, using the `cor` command. Finally, we will run the `summarise` command to see the mean, min, max, and quartiles of each of the distributions.
+
+```{r sanity}
+# Look at the first and last 6 rows of the dataframe
+head(df1)
+tail(df1)
+
+# Compare the correlation we set to the correlation we calculate
+check <- round(cor(df1$accnt, df1$econ)) == round(cor)
+print(ifelse(check, "The correlations are the same!", "Oops, the correlations are not the same."))
+
+# Generate summary statistics 
+print("Economists Summary Stats")
+summary(df1$econ)
+print("Accountant Summary Stats")
+summary(df1$accnt)
+
+### Picking a Career
+
+#Our assumption is that every person will choose to be an accountant or an economist based on what will maximize their salary. We will assign job labels strictly based on where an individual will earn more, i.e. Y<sub>i</sub> = max(Y<sub>e,i</sub>, Y<sub>a,i</sub>)
+#```{r jobs}
+# Assign job labels
+df1 <- df1 %>% mutate(job = ifelse(econ > accnt, "econ", "accnt"))
+
+# Take a look at the change to the dataframe using head
+head(df1)
+```
+
+### Results
+
+```{r results}
+# Make results dataframe
+results <- df1 %>% 
+            group_by(job) %>% # Group all of the rows with the same "job" together
+            summarise('Economist Earnings' = mean(econ), 'Accountant Earnings' = mean(accnt),
+                      n=n()) %>% # Calculate means and counts for economicts and accountants
+            mutate(job = c("Accountant", "Economist")) %>% # add labels
+            t() # transpose
+
+colnames(results) <- c('Accountant', 'Economist')
+
+results <- as.data.frame(results) %>%
+            slice(2:4) %>%
+            mutate(
+              x= c('Economist Earnings', 'Accountant Earnings', 'n')
+            ) %>%
+            dplyr::select(x, Accountant, Economist)
+
+results
+```
+
+The columns are the job, and the rows are potential earnings. So in this case the (Economicst, Economist Earnings) cell is the average salary of economists that we observe in the real world. The (Economist, Accounting Earnings) is a COUNTERFACTUAL that is unobserved in the world, i.e. the average salary of economist had they become accountants instead. As discussed in lecture, a naive observer would simply would look at the observed salaries in (i.e. (Economicst, Economist Earnings) and (Accountant, Accountant Earnings)) and think that everyone should be an economist. However, the Roy model helps us understand that individuals are making rational choices about their employment based on characteristics that aren't easily observable. This is how economic and statistical models can help us make sense of what we see in the world.
+
+For a final check, calculate the weighted average of our observed and counterfactual outcomes (i.e., economists who became economists and accountants if they had become economists) and see if they come close to the distribution means we set initially. That is, close to 65k for accountants and 60k for economists. Spoiler: it works!
+
+### Question 1: Comparing to stata
+
+The two actually have the same sample size, but because it’s a random sample with a different seed and different program the two differ slightly.They would also differ if the sample size was different (with the larger sample size being more accurate).
+
+### Question 2: Changing the seed
+
+Changing the seed yields slightly different numbers for both the average earnings and the number of people who choose to be economists vs accountants, but it is still very close (this makes sense since it is a large sample size). The seed is a way of simulating randomness (while yielding the same results for the same seed). Since the seed is different we get similar but different results.
+
+```{r}
+set.seed(11101953)
+samples <- 1000000
+cor <- 0.9
+data2 <- mvrnorm(n=samples, mu=c(0, 0), Sigma=matrix(c(1, cor, cor, 1), nrow=2), empirical=FALSE)
+
+df2 <- as_data_frame(data2)
+df2 <- df2 %>% dplyr::rename(accnt = V1, econ = V2) # rename 
+
+df2 <- df2 %>% mutate(
+        accnt = accnt*sigma_accnt + mu_accnt, 
+        econ = econ*sigma_econ + mu_econ
+        )
+
+df2 <- df2 %>% mutate(job = ifelse(econ > accnt, "econ", "accnt"))
+
+results2 <- df2 %>% 
+            group_by(job) %>%
+            summarise('Economist Earnings' = mean(econ), 'Accountant Earnings' = mean(accnt),n=n()) %>%
+            mutate(job = c("Accountant", "Economist")) %>%
+            t() 
+
+colnames(results2) <- c('Accountant', 'Economist')
+
+results2 <- as.data.frame(results2) %>%
+            slice(2:4) %>%
+            mutate(
+              x= c('Economist Earnings', 'Accountant Earnings', 'n')
+            ) %>%
+            dplyr::select(x, Accountant, Economist)
+
+results2
+```
+
+### Question 3: Calculating the conditional standard deviations
+
+The standard deviation of earnings for those who choose to become economists is 5709.5, much smaller than the complete sample while the accountants standard deviation is 4496.6. This makes sense since only those whose earnings are higher for each one are choosing that profession. In other words the people on the lower end of each earning spectrum are not choosing that profession making the range of incomes smaller and less variable for each profession. 
+
+```{r}
+df1 %>%
+  filter(job == "econ") %>%
+  summarise('Economist Earnings Standard Deviation' = sd(econ))
+
+df1 %>%
+  filter(job == "accnt") %>%
+  summarise('Accountant Earnings Standard Deviation' = sd(accnt))
+```
+
+### Question 4: Increaing the Standard Deviation for Economists
+
+When you increase the standard deviation for economists, not only do more people choose to be economists, but the average income of those that choose to be economists increases. Meanwhile the average income of accountants decreases slightly (and obviously less people choose to be accountants). It seems that with a little more variance for economists the amount of people who are making more as economists goes up slightly as do the average earnings of those people. 
+
+```{r}
+
+df3 <- as_data_frame(data)
+df3 <- df3 %>% dplyr::rename(accnt = V1, econ = V2) # rename 
+
+sigma_econ = 12000
+
+df3 <- df3 %>% mutate(
+        accnt = accnt*sigma_accnt + mu_accnt, 
+        econ = econ*sigma_econ + mu_econ
+        )
+
+df3 <- df3 %>% mutate(job = ifelse(econ > accnt, "econ", "accnt"))
+
+results3 <- df3 %>% 
+            group_by(job) %>%
+            summarise('Economist Earnings' = mean(econ), 'Accountant Earnings' = mean(accnt),n=n()) %>%
+            mutate(job = c("Accountant", "Economist")) %>%
+            t() 
+
+colnames(results3) <- c('Accountant', 'Economist')
+
+results3 <- as.data.frame(results3) %>%
+            slice(2:4) %>%
+            mutate(
+              x= c('Economist Earnings', 'Accountant Earnings', 'n')
+            ) %>%
+            dplyr::select(x, Accountant, Economist)
+
+results3
+```
+

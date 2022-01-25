@@ -1,0 +1,137 @@
+---
+title: "ps_2"
+author: "David Hackett"
+date: "1/24/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+rm(list = ls())
+library(tidyverse)
+wages <- read_csv("wage.csv")
+murders <- read_csv("murder.csv")
+```
+
+## 1 The Returns to Schooling or IQ?
+
+1. Regressing wage on years of education
+
+```{r}
+lm(formula = wage~educ, data = wages) %>%
+  summary()
+```
+
+The estimated return on education is 1.214 more dollars per hour per year of education. Ir gives 11.0394 as the y intercept, in other words the predicted hourly wage for someone with 0 years of schooling which probably is not very accurate given the dataset has no one meeting that criteria. The p values for both are extremely low, well below .01 and pretty close to 0 meaning that the relationship is significant between education and wages (we can reject the null hypothesis that b1 is 0). However the R squared is only 0.053, meaning educationonly explains about 5% of the variation in wages.
+
+2. Regressing education on iq
+
+```{r}
+lm(formula = wage~IQ, data = wages) %>%
+  summary()
+```
+
+Similar to wage this finds a positive relationship, for each point of IQ a person can expect about 15 cents more per hour. The predict hourly wage for someone with an iq of 0 (ie the y intercept) is 12.64 dollars per hour which is pretty impressive...
+
+Anyway the p values for both b1 b0 in this case are again well below 0.01 and close to zero indicating that we can reject the null hypothesis and that there is a significant relationship between wages and IQ. Like education though IQ only explains a little of the variation, roughly 3.7%.
+
+3. Regressing wages on education and IQ
+
+```{r}
+lm(formula = wage~ educ + IQ, data = wages) %>%
+  summary()
+```
+
+Yes the b1 (the coefficient for educ) is 0.94256 where it was roughly 1.21 before.
+
+4. Using the log of wages
+
+```{r}
+
+wages$lwage <- log(wages$wage)
+
+```
+
+## 2 Murder Rate and Executions
+
+1. Summary stats
+
+```{r}
+
+murders <- murders %>%
+  mutate(murderrate = (murder / population) * 10000,
+         execrate = (execution / population) * 10000)
+
+murders %>%
+  summarise(mean_murder = mean(murderrate))
+
+murders %>%
+  arrange(desc(murderrate)) %>%
+  head(2)
+
+murders %>%
+  arrange(murderrate) %>%
+  head(2)
+
+murders %>%
+  filter(execution == 0) %>%
+  summarise(no_executions = n())
+
+murders %>%
+  arrange(desc(execution)) %>%
+  head(2)
+
+murders %>%
+  arrange(desc(execrate)) %>%
+  head(1)
+  
+
+
+```
+The mean murder rate per 10000 is 0.665. Washington DC has the highest murder rate, but among actual states its Louisiana. Montana had the lowest murder rate (suspiciously its 0). 30 states had no executions. Virginia has the most executions with 8, but Delaware had the highest rate with 0.04 per 10000.
+
+
+2. Regressing murder rate on execution rate
+
+```{r}
+lm(formula = murderrate~ execrate, data = murders) %>%
+  summary()
+```
+
+The regression did show a negative correlation between execution rate and murder rate. For each 1 in 10000 executed the murder rate is predicted to go down 1.94 per 10000. However the p value is very high, 0.93, indicating this relationship is not significant and we cannot reject the null hypothesis (that b1 is 0). This result most likely comes from chance not an actual relationship between the two variables. So no we can not assume that executionsare a deterrent. 
+
+
+3. Regressing murder rate on exeuction rate using only states with at least one murder
+
+```{r}
+
+lm(formula = murderrate~ execrate, data = filter(murders, execution > 0)) %>%
+  summary()
+
+```
+
+The coefficient for execrate became even more negative showing a larger negative correlation between the two. However once again the p value is pretty large, not as large as before, but .55 for b1 indicates that this result is not significant so once again we can not reject the null and we can not assume that executions are a deterrent.
+
+
+4. Regressing murder rate on whether state had capital punishment or not
+
+```{r}
+
+murders$had_executions <- ifelse(murders$execution > 0, 1, 0)
+
+lm(formula = murderrate~ had_executions, data = murders) %>%
+  summary()
+
+```
+
+This model actually found a positive relationship between a state allowing executions and that states murder rate. Having executions increased the murder rate by 0.086 per 10000. Once may actually draw from this that murders should be the x variable and executions the y. However once again that p value is high, indicating this isn't a significant result and we can not reject the null hypothesis. 
+
+
+5. No this definitely isn't suitable for a whole host of reasons. Obviously we can't randomize the states into allowing capital punishment (and using it at a given frequency) or not. States get to choose whether they allow executions. So there is no getting around the selection bias. Outside of that the sample is quite small and we are certainly missing other covariates that might play into murder rates (the average income of the state or gun ownership for example).  
+
+
+ 
