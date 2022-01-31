@@ -2,7 +2,9 @@
 title: "ps_2"
 author: "David Hackett"
 date: "1/24/2022"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -26,27 +28,25 @@ lm(formula = wage~educ, data = wages) %>%
   summary()
 ```
 
-The estimated return on education is 1.214 more dollars per hour per year of education. Ir gives 11.0394 as the y intercept, in other words the predicted hourly wage for someone with 0 years of schooling which probably is not very accurate given the dataset has no one meeting that criteria. The p values for both are extremely low, well below .01 and pretty close to 0 meaning that the relationship is significant between education and wages (we can reject the null hypothesis that b1 is 0). However the R squared is only 0.053, meaning educationonly explains about 5% of the variation in wages.
+The estimated return on education is 1.214 more dollars per hour per year of education. It gives 11.0394 as the y intercept, in other words the predicted hourly wage for someone with 0 years of schooling (which probably is not very accurate given the dataset has no one meeting that criteria). The p values for both coefficients are extremely low, well below .01 and pretty close to 0 meaning that with an alpha of .05 or even one as low as .01 they are statistically significant, so we can reject the null hypothesis that b1 is 0. However the R squared is only 0.053, meaning education only explains about 5% of the variation in wages.
 
 2. Regressing education on iq
 
 ```{r}
-lm(formula = wage~IQ, data = wages) %>%
+lm(formula = educ~IQ, data = wages) %>%
   summary()
 ```
 
-Similar to wage this finds a positive relationship, for each point of IQ a person can expect about 15 cents more per hour. The predict hourly wage for someone with an iq of 0 (ie the y intercept) is 12.64 dollars per hour which is pretty impressive...
+IQ has a positive correlation with education. For every 1 point of IQ the model predicts the person has had 0.075 more years of education (so roughly 13 iq points equals one more year of education). I would think that IQ is also positively correlated with wage so this means that the model from question 1 is not likely to be an unbiased estimate. It is likely too high since IQ is positively correlated with years of education.
 
-Anyway the p values for both b1 b0 in this case are again well below 0.01 and close to zero indicating that we can reject the null hypothesis and that there is a significant relationship between wages and IQ. Like education though IQ only explains a little of the variation, roughly 3.7%.
-
-3. Regressing wages on education and IQ
+3. Regressing wages on education while IQ
 
 ```{r}
 lm(formula = wage~ educ + IQ, data = wages) %>%
   summary()
 ```
 
-Yes the b1 (the coefficient for educ) is 0.94256 where it was roughly 1.21 before.
+The b1 estimate (the coefficient for educ) is different thatn before, it's 0.94256 when holding IQ constant where it was roughly 1.21 in the bivariate regression. This means that some of the effect we were seeing when we just ran the regression with just education was also capturing the effects from IQ. When we hold IQ constant the impact from education is not as great. 
 
 4. Using the log of wages
 
@@ -54,7 +54,28 @@ Yes the b1 (the coefficient for educ) is 0.94256 where it was roughly 1.21 befor
 
 wages$lwage <- log(wages$wage)
 
+meanbyeduc <- wages %>%
+  group_by(educ) %>%
+  summarise(lwage_mean = mean(lwage), wage_mean = mean(wage))
+
+meanbyeduc %>%
+  ggplot(aes(x=educ, y=wage_mean))+
+  geom_point() +
+  geom_line() +
+  ylim(0, 40)
+
+meanbyeduc %>%
+  ggplot(aes(x=educ, y=lwage_mean)) +
+  geom_point() +
+  geom_line() +
+  ylim(0, 4)
+
+summary(lm(lwage~educ, data = wages))
+
 ```
+
+The two graphs look pretty similar actually, but maybe lwage is a little more linear that wage which would generally make it a better fit for a linear regerssion. Als in class we discussed that lwage should fit education better, which makes intuitive sense. However for this data the r squared for using wage is slightly better than for lwage meaning that model explains more of the variance. I wouldn't say one is hands down better for this data in particular. In general I'd look at log wage as the regressand but for this data wage might actually be the better y variable.
+
 
 ## 2 Murder Rate and Executions
 
@@ -66,25 +87,26 @@ murders <- murders %>%
   mutate(murderrate = (murder / population) * 10000,
          execrate = (execution / population) * 10000)
 
+# Mean Murder Rate
 murders %>%
   summarise(mean_murder = mean(murderrate))
 
+# Highest Murder Rates (checking for a tie)
 murders %>%
   arrange(desc(murderrate)) %>%
   head(2)
 
+# Lowest Murder Rates
 murders %>%
   arrange(murderrate) %>%
   head(2)
 
+# Number of states with no executions
 murders %>%
   filter(execution == 0) %>%
   summarise(no_executions = n())
 
-murders %>%
-  arrange(desc(execution)) %>%
-  head(2)
-
+# Highest Execution Rate
 murders %>%
   arrange(desc(execrate)) %>%
   head(1)
@@ -92,7 +114,7 @@ murders %>%
 
 
 ```
-The mean murder rate per 10000 is 0.665. Washington DC has the highest murder rate, but among actual states its Louisiana. Montana had the lowest murder rate (suspiciously its 0). 30 states had no executions. Virginia has the most executions with 8, but Delaware had the highest rate with 0.04 per 10000.
+The mean murder rate per 10000 is 0.665. Washington DC has the highest murder rate, but among actual states its Louisiana. Montana had the lowest murder rate (suspiciously its 0). 30 states had no executions. Delaware had the highest execution rate with 0.04 per 10000.
 
 
 2. Regressing murder rate on execution rate
@@ -102,10 +124,10 @@ lm(formula = murderrate~ execrate, data = murders) %>%
   summary()
 ```
 
-The regression did show a negative correlation between execution rate and murder rate. For each 1 in 10000 executed the murder rate is predicted to go down 1.94 per 10000. However the p value is very high, 0.93, indicating this relationship is not significant and we cannot reject the null hypothesis (that b1 is 0). This result most likely comes from chance not an actual relationship between the two variables. So no we can not assume that executionsare a deterrent. 
+The regression did show a negative correlation between execution rate and murder rate. For each 1 in 10000 executed the murder rate is predicted to go down 1.94 per 10000. However the p value is very high for the b1 estimate, 0.93, indicating this effect is not significant with an alpha of 0.05 (not even close) and we cannot reject the null hypothesis (that b1 is 0). This result most likely comes from random chance and not an actual relationship between the two variables. So this does not provide any good evidence that executions are a deterrent.
 
 
-3. Regressing murder rate on exeuction rate using only states with at least one murder
+3. Regressing murder rate on execution rate using only states with at least one murder
 
 ```{r}
 
@@ -114,7 +136,7 @@ lm(formula = murderrate~ execrate, data = filter(murders, execution > 0)) %>%
 
 ```
 
-The coefficient for execrate became even more negative showing a larger negative correlation between the two. However once again the p value is pretty large, not as large as before, but .55 for b1 indicates that this result is not significant so once again we can not reject the null and we can not assume that executions are a deterrent.
+The coefficient for execrate became even more negative showing a larger negative correlation between the two based on this data. However once again the p value is pretty large, not as large as before, but .55 for the b1 estimate indicates that this result is not significant with a alpha of 0.05 (again not even close) so once again we can not reject the null and this doesn't provide any good evidence that executions are a deterrent. 
 
 
 4. Regressing murder rate on whether state had capital punishment or not
@@ -128,10 +150,19 @@ lm(formula = murderrate~ had_executions, data = murders) %>%
 
 ```
 
-This model actually found a positive relationship between a state allowing executions and that states murder rate. Having executions increased the murder rate by 0.086 per 10000. Once may actually draw from this that murders should be the x variable and executions the y. However once again that p value is high, indicating this isn't a significant result and we can not reject the null hypothesis. 
+This model actually found a positive relationship between a state allowing executions and that states murder rate. Having executions increased the murder rate by 0.086 per 10000 (could it be that murders should be the x variable and executions the y?). However once again that p value is high for b1 hat, with an alpha of 0.05 this isn't a significant result and we can not reject the null hypothesis. 
 
 
-5. No this definitely isn't suitable for a whole host of reasons. Obviously we can't randomize the states into allowing capital punishment (and using it at a given frequency) or not. States get to choose whether they allow executions. So there is no getting around the selection bias. Outside of that the sample is quite small and we are certainly missing other covariates that might play into murder rates (the average income of the state or gun ownership for example).  
+5. No this definitely isn't suitable for a whole host of reasons. Obviously we can't randomize the states into allowing capital punishment (and using it at a given frequency) or not. States get to choose whether they allow executions, so there is no getting around the selection bias. Outside of that the sample is quite small and we are certainly missing other covariates that might play into murder rates (the average income of the state or gun ownership for example).
+
+
+## 3 Short Answer
+
+1. It could be unbiased. However the residuals being uncorrelated with x does not necessarily the conditional mean zero requirement is fufilled and we also don't know how the sampling was done (random sampling is i.i.d). The other two assumptions that make the estimator unbiased (linear relationship and variation in x) also aren't talked about. We also cannot say with certainty that there is a causal relationship. If the result is unbiased and if the p values are below the given alpha there is strong evidence of correlation. This might also be evidence of causality, but the causality could go the other way or there could be another variable that explains the correlation between the two. We'd need to rely on knowing other things to make that jump in logic (is there a good reason why X might cause Y), and even then we can't say with 100% certainty.  
+
+2. False unless the variance of Y is the same as X since that is the denominator of the formula for b1. The numerator should stay the same but with a different variance on the bottom the estimate for b1 should change. The estimate for b0 should also change unless the means for X and Y are the same. 
+
+3. Generally false, a higher variance in X leads to more precise estimates (since the variance of x is in the denominator of the variance for b1). However this also depends on the estimated variance of the residuals for each sample.
 
 
  
