@@ -1,0 +1,133 @@
+---
+title: "ps3"
+author: "David Hackett"
+date: "2/2/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+library(tidyverse)
+star <- read_csv("star.csv")
+```
+
+
+## 1. Multivariate Regressions
+
+Regressing reading scores on treatment 1 and treatment 2
+```{r}
+summary(lm(formula = treadssk~T1+T2, data=star))
+```
+
+Regressing math scores on treatment 1 and treatment 2
+
+```{r}
+summary(lm(formula = tmathssk~T1+T2, data=star))
+```
+
+The results from these regressions are the same as I saw when calculating the treatment effect and p values in assignment 1, in fact all the coefficients are the exact same as the the treatment effect found in problem set 1 and the p values are the exact same as well. The first treatment had a small negative correlation with math scores and a small positive correlation with reading scores, but the p values were much higher than 0.05, so even with that slightly more lax standard of significance (compared to 0.01 or 0.001) we can not reject the null hypothesis that the coefficient treatment 1 for both math and reading is 0 (ie no effect) just like we could not reject the treatment effect from ps1 wasn't 0. Treatment 2 (smaller classes) on the other hand did have a positive correlation for both math (close to a 6 point boost if in a smaller class) and reading scores (almost 8 points). Likewise the p values for both are quite small, well below 0.001 so even using that as the alpha we have a significant result. I found the same thing in ps1. 
+
+## 2. Using controls in the regression 
+
+Regressing reading scores on T1 and T2 with controls
+
+```{r}
+summary(lm(formula = treadssk~T1+T2+sch_inner_city+sfemale+swhite+sfree_lunch+ttotexpk+tmasters+twhite, data=star))
+```
+
+Regressing reading scores on T1 and T2 with controls
+
+```{r}
+summary(lm(formula = tmathssk~T1+T2+sch_inner_city+sfemale+swhite+sfree_lunch+ttotexpk+tmasters+twhite, data=star))
+```
+
+With those controls all the coefficients went up a little bit, perhaps indicating some downward bias in original regression. However the change was not very large (which is good considering this was an RCT). Treatment 2 went from 7.7ish to 7.9ish and given the scores are around 400 or 500 that change in coefficient isn't very much (though maybe its worth noting that treatment 1 now has a positive coefficient for math whereas before it was negative).
+
+Regressing reading scores on just the treatments as well as math on the two treatments produced r squared that indicating they only explained around 0.6% of the variation (for both). Using controls the models explain around 9.6% (taking the adjusted r squared) of the variation for reading and around 8.5% for math. This is a pretty big difference: over ten times as much variation was explained with the controls. The treatments did not explain a whole lot of the variation by themselves.
+
+
+## 3. Testing if b1 = b2 for both math and reading
+
+Adding a new column that adds t1 and t2
+
+```{r}
+star$totcol <- star$T1 + star$T2
+```
+
+Testing b1 = b2 for reading
+```{r}
+summary(lm(formula = treadssk~T1+totcol, data=star))
+```
+
+testing b1 = b2 for math
+```{r}
+summary(lm(formula = tmathssk~T1+totcol, data=star))
+```
+
+For both math and reading there is a large difference in the coefficients between treatment 1 and treatment 2. Running a modified regression to test whether the two are equal the p value for both tests is pretty close to 0 and much lower than 0.001. So in both cases we can reject the null hypothesis that the coefficient for treatment 1 is the same as treatment 2. 
+
+
+## 4. Testing whether student and teacher controls have an impact
+
+Regressing math scores on controls to get the f statistic for those
+
+```{r}
+summary(lm(formula = tmathssk~sch_inner_city+sfemale+swhite+sfree_lunch+ttotexpk+tmasters+twhite, data=star))
+```
+
+Removing rows with missing entries, obtaining SSRs
+```{r}
+star.filtered <- star %>%
+  filter(!is.na(tmathssk),
+         !is.na(sch_inner_city),
+         !is.na(sfemale+swhite),
+         !is.na(sfree_lunch),
+         !is.na(ttotexpk),
+         !is.na(tmasters),
+         !is.na(twhite)
+         )
+
+ssr_r <- sum(residuals(lm(formula = tmathssk~T1+T2, data=star.filtered)) ^ 2)
+
+ssr_u <- sum(residuals(lm(formula = tmathssk~T1+T2+sch_inner_city+sfemale+swhite+sfree_lunch+ttotexpk+tmasters+twhite, data=star)) ^ 2)
+
+# SSR restricted
+ssr_r  
+
+# SSR Unrestricted
+ssr_u
+```
+
+Calculate the f statistic
+```{r}
+
+q = 7
+k = 9
+n = 5850
+
+f_stat <- ((ssr_r - ssr_u)/q)/(ssr_u/(n - k - 1))
+
+
+# F statistic
+f_stat
+```
+
+Calculating the p value with the f_stat
+
+```{r}
+p_value <- pf(f_stat, 7, (n - 10), lower.tail = F)
+
+#p value
+p_value
+```
+
+I ran a restricted model and unrestricted model for math scores and used the SSR from those to obtain an F statistic. The F statistic was very big and the resulting p value very small (very close to 0). With an alpha of 0.05 (or even a more restrictive one), we reject the null hypothesis that the controls jointly have no effect in the model. I would pretty confidently say that those controls do have an effect on math scores.
+
+
+## 5. Other variables?
+
+I would say it is likely that there are omitted variable that could effect the unbiasedness of the treatment effects. Given that even the model with the controls only explains 8 or 9% of the variation there is a lot of the variation that is unexplained. Odds are in any model you are likely to miss something, but for something like academic outcomes for students there are a lot of factors that could impact those outcomes that may be hard to quantify or account for in some way.  
+
+
+
